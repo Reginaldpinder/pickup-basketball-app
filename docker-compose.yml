@@ -1,45 +1,34 @@
-version: '3.9'
-
 services:
-  db:
-    image: postgres:16
-    container_name: basketball-db
-    environment:
-      POSTGRES_USER: basketball
-      POSTGRES_PASSWORD: basketball123
-      POSTGRES_DB: basketball_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - basketball_data:/var/lib/postgresql/data
   frontend:
-  build:
-    context: ./frontend
-    dockerfile: Dockerfile
-  ports:
-    - "5173:5173"
-  volumes:
-    - ./frontend:/app
-    - /app/node_modules
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
   backend:
     build: ./backend
-    container_name: basketball-backend
-    command: >
-      sh -c "python manage.py migrate &&
-             python manage.py runserver 0.0.0.0:8000"
+    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
-    environment:
-      - DB_NAME=basketball_db
-      - DB_USER=basketball
-      - DB_PASSWORD=basketball123
-      - DB_HOST=db
-      - DB_PORT=5432
     depends_on:
       - db
 
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: basketball_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
 volumes:
-  basketball_data:
+  pgdata:
