@@ -5,6 +5,8 @@ from django.contrib.auth.models import User
 class Gym(models.Model):
     name = models.CharField(max_length=100)
     location = models.CharField(max_length=255)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='owned_gyms')
 
     def __str__(self):
