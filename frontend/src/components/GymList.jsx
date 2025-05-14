@@ -12,7 +12,7 @@ const GymList= () => {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
-        axios.get(`http://localhost:8000/api/gyms/nearby/?lat=${latitude}&lon=${longitude}`)
+        axios.get(`http://localhost:8000/api/gyms/nearby/?lat=${latitude}&lon=${longitude}&radius=25`)
           .then(res => {
             setGyms(res.data);
             setLoading(false);

@@ -1,10 +1,10 @@
 import React from 'react';
-import GymList from './components/GymList';
+import GymMap from './components/GymMap';
 
 function App() {
   return (
     <div className="App">
-      <GymList />
+      <GymMap />
     </div>
   );
 }

@@ -18,9 +18,10 @@ class GymViewSet(viewsets.ModelViewSet):
         lat = request.query_params.get('lat')
         lon = request.query_params.get('lon')
         zip_code = request.query_params.get('zip')
+        radius_km = float(request.query_params.get('radius', 25))  # default 25 km (~15 miles)
 
         if zip_code and (not lat or not lon):
-            # Use OpenStreetMap Nominatim to get coordinates from zip
+            # Use OpenStreetMap to resolve zip code
             resp = requests.get(f'https://nominatim.openstreetmap.org/search',
                                 params={'postalcode': zip_code, 'format': 'json', 'countrycodes': 'us'})
             if resp.status_code == 200 and resp.json():
@@ -37,7 +38,7 @@ class GymViewSet(viewsets.ModelViewSet):
         lon = float(lon)
 
         def haversine(lat1, lon1, lat2, lon2):
-            R = 6371
+            R = 6371  # Earth radius in km
             dlat = math.radians(lat2 - lat1)
             dlon = math.radians(lon2 - lon1)
             a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
@@ -45,10 +46,15 @@ class GymViewSet(viewsets.ModelViewSet):
             return R * c
 
         gyms = Gym.objects.exclude(latitude__isnull=True).exclude(longitude__isnull=True)
-        gyms_with_distance = [(gym, haversine(lat, lon, gym.latitude, gym.longitude)) for gym in gyms]
-        gyms_with_distance.sort(key=lambda x: x[1])
+        gyms_with_distance = [
+            (gym, haversine(lat, lon, gym.latitude, gym.longitude))
+            for gym in gyms
+        ]
 
-        serializer = self.get_serializer([g[0] for g in gyms_with_distance], many=True)
+        gyms_in_radius = [g[0] for g in gyms_with_distance if g[1] <= radius_km]
+        gyms_in_radius.sort(key=lambda g: haversine(lat, lon, g.latitude, g.longitude))  # sort by closest
+
+        serializer = self.get_serializer(gyms_in_radius, many=True)
         return Response(serializer.data)
 
 class CourtViewSet(viewsets.ModelViewSet):
