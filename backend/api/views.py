@@ -6,8 +6,8 @@ from django.conf import settings
 from rest_framework import status
 from django.db.models import F
 import math
-from .models import Gym, Court, Team, Player, Manager
-from .serializers import GymSerializer, CourtSerializer, TeamSerializer, PlayerSerializer, ManagerSerializer
+from .models import Gym , Court, Team, Player, Manager
+from .serializers import GymSerializer , CourtSerializer, TeamSerializer, PlayerSerializer, ManagerSerializer
 
 class GymViewSet(viewsets.ModelViewSet):
     queryset = Gym.objects.all()
@@ -56,18 +56,72 @@ class GymViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(gyms_in_radius, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def external(self, request):
+        lat = request.query_params.get('lat')
+        lon = request.query_params.get('lon')
+        radius_m = int(request.query_params.get('radius', 5000))
+
+        if not lat or not lon:
+            return Response({'error': 'Missing lat/lon'}, status=400)
+
+        query = f"""
+        [out:json];
+        (
+        node["leisure"="pitch"]["sport"="basketball"](around:{radius_m},{lat},{lon});
+        way["leisure"="pitch"]["sport"="basketball"](around:{radius_m},{lat},{lon});
+        relation["leisure"="pitch"]["sport"="basketball"](around:{radius_m},{lat},{lon});
+        );
+        out center;
+        """
+
+        try:
+            response = requests.get("https://overpass-api.de/api/interpreter", params={'data': query})
+            data = response.json()
+
+            gyms = []
+            for el in data.get('elements', []):
+                tags = el.get('tags', {})
+                name = tags.get('name', 'Unnamed Court')
+
+                # Use lat/lon directly for nodes
+                if el['type'] == 'node':
+                    lat_val = el['lat']
+                    lon_val = el['lon']
+                # Use center for way/relation
+                elif el['type'] in ['way', 'relation'] and 'center' in el:
+                    lat_val = el['center']['lat']
+                    lon_val = el['center']['lon']
+                else:
+                    continue
+
+                gyms.append({
+                    'name': name,
+                    'latitude': lat_val,
+                    'longitude': lon_val,
+                    'location': tags.get('addr:full') or tags.get('addr:street') or 'Unknown'
+                })
+
+            return Response(gyms)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
 
 class CourtViewSet(viewsets.ModelViewSet):
     queryset = Court.objects.all()
     serializer_class = CourtSerializer
 
+
 class TeamViewSet(viewsets.ModelViewSet):
     queryset = Team.objects.all()
     serializer_class = TeamSerializer
 
+
 class PlayerViewSet(viewsets.ModelViewSet):
     queryset = Player.objects.all()
     serializer_class = PlayerSerializer
+
 
 class ManagerViewSet(viewsets.ModelViewSet):
     queryset = Manager.objects.all()
